@@ -5,14 +5,8 @@ import { compactionInFlight, getChat, isTurnRunning, readSettingsRecord } from "
 
 export const dynamic = "force-dynamic";
 
-export default async function ChatPage({
-	params,
-	searchParams,
-}: {
-	params: Promise<{ id: string }>;
-	searchParams: Promise<{ prompt?: string }>;
-}) {
-	const [{ id }, { prompt }] = await Promise.all([params, searchParams]);
+export default async function ChatPage({ params }: { params: Promise<{ id: string }> }) {
+	const { id } = await params;
 	const chat = getChat(id);
 	if (!chat) notFound();
 	// The persistent setup CTA's seed (BYOK, owner 2026-09-22): slotsConfigured
@@ -30,7 +24,6 @@ export default async function ChatPage({
 				// native messages).
 				initialMessages={chat.messages}
 			initialConfigured={slotsConfigured(record?.models)}
-			initialPrompt={prompt}
 			// A teacher turn that outlived its client: the remounted view must
 			// attach (busy shimmer + poll), never resurrect the stale record.
 			initiallyInFlight={isTurnRunning(chat.id)}

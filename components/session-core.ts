@@ -39,6 +39,24 @@ export const TURN_POLL_MS = 500;
 /** Give up waiting (a wake turn can run long) and surface the 409. */
 export const TURN_WAIT_MAX_MS = 30_000;
 
+/**
+ * THE FIRST-MESSAGE HANDOFF: the composer creates the chat, then the
+ * /chat/[id] page sends the first message. The text crosses that
+ * navigation in sessionStorage, never in the URL: a ?prompt= query counts
+ * against the server's ~16 KB request-header limit, so a long paste got
+ * HTTP 431, the page never loaded, and the chat was left empty.
+ */
+const firstPromptKey = (chatId: string) => `lh:first-prompt:${chatId}`;
+export function stashFirstPrompt(chatId: string, text: string): void {
+	sessionStorage.setItem(firstPromptKey(chatId), text);
+}
+export function readFirstPrompt(chatId: string): string | undefined {
+	return sessionStorage.getItem(firstPromptKey(chatId)) ?? undefined;
+}
+export function clearFirstPrompt(chatId: string): void {
+	sessionStorage.removeItem(firstPromptKey(chatId));
+}
+
 export interface SessionModelDeps {
 	/** Injectable fetch (tests); defaults to the global. */
 	fetch?: typeof globalThis.fetch;
@@ -575,7 +593,7 @@ export class SessionModel {
 			// the dead-session-start postmortem): the POST must NOT ride
 			// consumeAbort. Diet A's abort-on-unmount (session.ts's stop())
 			// fires on React StrictMode's simulated remount in dev — it killed
-			// the ?prompt first send ~8ms in (POST aborted, never retried:
+			// the first-message send ~8ms in (POST aborted, never retried:
 			// the page's sentInitial guard had already flipped), leaving the
 			// session dead until a second message, which then persisted
 			// WITHOUT the first — the optimistic tail rode a record that never

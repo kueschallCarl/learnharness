@@ -13,6 +13,7 @@ import { StatsBar } from "@/components/stats-bar";
 import { ChainTableOverlay } from "@/components/chain-table.tsx";
 import { ComposerActions, NodePickerControl } from "@/components/composer-actions";
 import type { ChatSettings, GraphSnapshot } from "@/src/core";
+import { stashFirstPrompt } from "@/components/session-core";
 
 /** The draft's pick set (owner round 10): the SAME shape the home pick
  *  bar lifts — resolved nodes as the learner SAW them at pick time. */
@@ -35,8 +36,9 @@ const DOCK = "mx-auto w-full max-w-[46rem] px-4";
 /**
  * The draft's whole behavior as one pure seam: create the session (title =
  * the first message), persist the lifted pre-chat settings, return the push
- * target — /chat/<id>?prompt=<msg> — whose initialPrompt path delivers the
- * message as turn 1. Injected fetch/router so tests pin the contract.
+ * target — /chat/<id> — and stash the message (stashFirstPrompt) for that
+ * page's first send, which delivers it as turn 1. Injected fetch/router so
+ * tests pin the contract.
  * Returns null on empty text; rethrows on transport failure (the caller's
  * busy flag resets).
  */
@@ -64,7 +66,8 @@ export async function startDraftSession(
 	const { id } = (await res.json()) as { id: string };
 	// No settings PUT on create (per-session models, owner 2026-09-28):
 	// the SERVER stamps the newborn from the strong slot.
-	return `/chat/${id}?prompt=${encodeURIComponent(t)}`;
+	stashFirstPrompt(id, t);
+	return `/chat/${id}`;
 }
 
 /** The pure shell (no router) — the render-test seam: the draft view's

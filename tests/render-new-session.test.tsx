@@ -5,6 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { DraftShell, startDraftSession } from "../components/new-session.tsx";
+import { readFirstPrompt } from "../components/session-core.ts";
 
 /**
  * The sessionless draft view (/chat/new, owner 2026-09-13): "+ New session"
@@ -25,14 +26,23 @@ function fakeFetch(id: string) {
 }
 
 describe("startDraftSession — the create-on-send contract", () => {
-	it("creates the session titled with the first message, returns the prompt redirect", async () => {
+	it("creates the session titled with the first message, redirects without it in the URL", async () => {
 		const { f, calls } = fakeFetch("c_new");
 		const target = await startDraftSession("teach me orbital mechanics", f);
-		assert.equal(target, "/chat/c_new?prompt=teach%20me%20orbital%20mechanics");
+		assert.equal(target, "/chat/c_new");
+		assert.equal(readFirstPrompt("c_new"), "teach me orbital mechanics");
 		assert.equal(calls.length, 1);
 		assert.equal(calls[0]!.url, "/api/chats");
 		assert.equal(calls[0]!.method, "POST");
 		assert.deepEqual(calls[0]!.body, { title: "teach me orbital mechanics" });
+	});
+
+	it("a message far past the ~16 KB request-header limit reaches the chat page whole", async () => {
+		const { f } = fakeFetch("c_big");
+		const html = Array.from({ length: 900 }, (_, i) => `<p class="row">line ${i} &amp; more</p>`).join("\n");
+		const target = await startDraftSession(html, f);
+		assert.equal(target, "/chat/c_big", "the text never rides the URL (it was HTTP 431)");
+		assert.equal(readFirstPrompt("c_big"), html);
 	});
 
 	it("no settings PUT on create — the server stamps the newborn (per-session models, owner 2026-09-28)", async () => {
@@ -188,7 +198,7 @@ describe("the practice draft (?mode=practice, 2026-10-04)", () => {
 			return new Response(JSON.stringify({ id: "c9" }), { status: 201 });
 		}) as unknown as typeof fetch;
 		const target = await startDraftSession("the parity chain", f, "practice");
-		assert.equal(target, "/chat/c9?prompt=the%20parity%20chain");
+		assert.equal(target, "/chat/c9");
 		assert.deepEqual(body, { title: "the parity chain", kind: "practice" });
 	});
 

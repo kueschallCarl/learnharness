@@ -13,6 +13,7 @@ import { useFieldCycle } from "@/components/field-cycle";
 import { SidebarToggle } from "@/components/sidebar";
 import { StatsBar } from "@/components/stats-bar";
 import type { TurnUsage } from "@/src/core";
+import { stashFirstPrompt } from "@/components/session-core";
 
 /**
  * Home — the knowledge graph is the main view, full-bleed edge to edge
@@ -150,7 +151,8 @@ export function Home({
 			// No settings PUT on create (per-session models, owner
 			// 2026-09-28): the SERVER stamps the newborn from the strong
 			// slot — the same default this surface's model control edits.
-			router.push(`/chat/${id}?prompt=${encodeURIComponent(t)}`);
+			stashFirstPrompt(id, t);
+			router.push(`/chat/${id}`);
 		} catch {
 			setBusy(false);
 		}

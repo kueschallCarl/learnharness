@@ -2,7 +2,7 @@
 
 import { createContext, Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useChatSession } from "@/components/session";
-import { visibleQueuedSteers } from "@/components/session-core";
+import { clearFirstPrompt, readFirstPrompt, visibleQueuedSteers } from "@/components/session-core";
 import { SetupDialog } from "@/components/setup-dialog";
 import { Hint } from "@/components/ui/hint";
 import { useZeroKeys, ZeroKeysPill } from "@/components/setup-cta";
@@ -198,7 +198,6 @@ export function Chat({
 	chatId,
 	title,
 	initialMessages,
-	initialPrompt,
 	initiallyInFlight,
 	initiallyCompacting = false,
 	initialConfigured = false,
@@ -211,7 +210,6 @@ export function Chat({
 	 *  renders no phase chip (no probe→teach arc applies) and a Practice
 	 *  tag rides the header instead. */
 	kind?: "teach" | "practice";
-	initialPrompt?: string;
 	/** A teacher turn is running server-side but attached to no client
 	 * (navigated away mid-turn, returned while in flight). */
 	initiallyInFlight?: boolean;
@@ -247,14 +245,18 @@ export function Chat({
 	setReattachSettled(() => reattachSettledRef.current());
 
 	// New chat with a topic: send the first message exactly once
-	// (initialPromptOwed — the pure gate, pinned in the test suite).
+	// (initialPromptOwed — the pure gate, pinned in the test suite). The
+	// text arrives via sessionStorage (stashFirstPrompt); once the record
+	// holds a real conversation it is spent and cleared.
 	const sentInitial = useRef(false);
 	useEffect(() => {
-		if (!sentInitial.current && initialPromptOwed(initialMessages, initialPrompt)) {
+		if (sentInitial.current) return;
+		const prompt = readFirstPrompt(chatId);
+		if (initialPromptOwed(initialMessages, prompt)) {
 			sentInitial.current = true;
-			void send({ type: "text", text: initialPrompt! });
-		}
-	}, [initialPrompt, initialMessages, send]);
+			void send({ type: "text", text: prompt! });
+		} else if (prompt) clearFirstPrompt(chatId);
+	}, [chatId, initialMessages, send]);
 
 	// A turn running server-side, attached to no live view of ours (navigate
 	// away mid-turn, or a wake turn discovered mid-session): the reattach
