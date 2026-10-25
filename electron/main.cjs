@@ -192,10 +192,23 @@ function log(line) {
 	}
 }
 
+/** The binary that runs the server as plain Node (ELECTRON_RUN_AS_NODE).
+ *  macOS: the bundled Helper, never the main executable. Run from the main
+ *  executable, the child registers with LaunchServices as a second
+ *  foreground "LearnHarness" that never checks in, so Force Quit lists it as
+ *  not responding; force-quitting it killed the server under a live window
+ *  (gray screen). The Helper is LSUIElement and stays invisible. */
+function nodeBinary() {
+	if (process.platform !== "darwin") return process.execPath;
+	const helper = `${app.getName()} Helper`;
+	return path.join(path.dirname(process.execPath), "..", "Frameworks", `${helper}.app`, "Contents", "MacOS", helper);
+}
+
 function startServer(port) {
 	return new Promise((resolve, reject) => {
+		const startedAt = Date.now();
 		const child = spawn(
-			process.execPath,
+			nodeBinary(),
 			[serverEntry()],
 			{
 				cwd: path.dirname(serverEntry()),
@@ -223,13 +236,33 @@ function startServer(port) {
 		child.stderr.on("data", fwd);
 		child.on("exit", (code, signal) => {
 			log(`server exited (code=${code} signal=${signal})`);
+			// killServer nulls serverProcess before killing, so a child that is
+			// still current died on its own: bring it back under the open
+			// window. ponytail: one rule against crash loops — a server that
+			// dies within 10s of starting is not restarted.
+			const restart = serverProcess === child && Date.now() - startedAt > 10_000;
 			serverProcess = null;
 			chatgptChild?.dispose();
 			chatgptChild = null;
-			chatgpt?.close();
+			if (restart) void restartServer(port);
+			else chatgpt?.close();
 		});
 		resolve(child);
 	});
+}
+
+async function restartServer(port) {
+	const url = `http://127.0.0.1:${port}`;
+	log("server died unexpectedly — restarting");
+	try {
+		await startServer(port);
+		await waitUntilUp(url);
+	} catch (err) {
+		log(`server restart failed: ${err?.message ?? err}`);
+		return;
+	}
+	log(`server up again: ${url}`);
+	for (const win of BrowserWindow.getAllWindows()) win.webContents.reload();
 }
 
 /** No "ready" event exists — poll until the server answers (docs-confirmed). */
@@ -462,36 +495,12 @@ function installUpdateNow() {
 }
 
 function setupAutoUpdater() {
-	if (!app.isPackaged) {
-		log("auto-update: dev build — updater disabled");
-		return;
-	}
-	try {
-		autoUpdater = require("electron-updater").autoUpdater;
-	} catch (err) {
-		log(`auto-update: electron-updater unavailable (${err?.message ?? err}) — updates disabled`);
-		return;
-	}
-	const feed = process.env.LH_UPDATE_FEED;
-	if (feed) {
-		autoUpdater.setFeedURL({ provider: "generic", url: feed });
-		log(`auto-update: LH_UPDATE_FEED override → ${feed}`);
-	}
-	autoUpdater.autoDownload = true;
-	autoUpdater.autoInstallOnAppQuit = true;
-	// Route every updater log line through the shell's own log (userData/
-	// logs/main.log) — feed failures must be diagnosable after the fact.
-	autoUpdater.logger = {
-		info: (m) => log(`updater: ${m}`),
-		warn: (m) => log(`updater warn: ${m}`),
-		debug: (m) => {}, // too chatty for the persistent log
-		error: (m) => log(`updater error: ${m}`),
-	};
-	autoUpdater.on("update-downloaded", (info) => {
-		log(`update downloaded: ${info?.version} — banner shown`);
-		broadcastUpdateStatus({ status: "downloaded", version: info?.version ?? null });
-	});
-	autoUpdater.on("error", (err) => log(`updater error: ${err?.message ?? err}`));
+	// Fork build (kueschallCarl/learnharness): updates stay off. The baked
+	// feed is upstream's GitHub releases, signed with upstream's Developer
+	// ID; a locally ad-hoc-signed fork copy can't install them, and pulling
+	// upstream silently would replace the fork. autoUpdater stays null, so
+	// every other updater path below no-ops.
+	log("auto-update: fork build — updater disabled");
 }
 
 function zoomStep(win, dir) {
@@ -517,9 +526,6 @@ function installMenu() {
 			label: app.name,
 			submenu: [
 				{ role: "about" },
-				// Manual check (Wave C): answers via native dialog — no renderer
-				// round-trip. The 24h automatic checks stay silent.
-				{ label: "Check for Updates…", click: () => checkForUpdates({ manual: true }) },
 				{ type: "separator" },
 				{ role: "hide" },
 				{ role: "hideOthers" },
