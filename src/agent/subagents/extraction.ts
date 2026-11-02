@@ -713,7 +713,7 @@ export interface ExtractionModels {
 	 *  stages lands). BYOK (owner, 2026-09-22): the chain (role override →
 	 *  slot → NOTHING) may end EMPTY → undefined; the front doors refuse
 	 *  with ModelsNotConfiguredError before any stage runs. */
-	engineFor?: (role: ModelRole) => PiEngine | undefined;
+	engineFor?: (role: ModelRole) => PiEngine | undefined | Promise<PiEngine | undefined>;
 	/** Key-presence gate (provider-key interlude, 2026-09-25): given a
 	 *  stage engine's provider + the role's slot tier, the injected check
 	 *  returns the refusal envelope when the provider's key is missing
@@ -791,17 +791,23 @@ export function createExtractionPipeline(deps: ExtractionPipelineDeps): Extracti
 	// stage call server-side) — the job runner's exact treatment. undefined
 	// = the BYOK chain came up empty; the front-door guards turn that into
 	// an honest refusal.
-	const stageEngine = (role: ModelRole, override?: PiEngine): PiEngine | undefined =>
+	const stageEngine = (role: ModelRole, override?: PiEngine): PiEngine | undefined | Promise<PiEngine | undefined> =>
 		override ?? deps.engineFor?.(role);
 	/** The per-need refusal guard: which slot tiers the pipeline's stages
 	 *  found unset (test values count as configured — they ARE engines),
 	 *  and whether a configured stage's provider key is gone (provider-key
 	 *  interlude, 2026-09-25) — both refuse BEFORE any batch runs. */
-	function refuseIfStagesUnready(): void {
-		const stages: readonly [ModelRole, PiEngine | undefined][] = [
-			["extractor", stageEngine("extractor", deps.extractor)],
-			["auditor", stageEngine("auditor", deps.auditor)],
-		];
+	function refuseIfStagesUnready(): void | Promise<void> {
+		const extractor = stageEngine("extractor", deps.extractor);
+		const auditor = stageEngine("auditor", deps.auditor);
+		// The registry's synchronous registration/abort prefix must remain
+		// synchronous when engines are already present (including test fakes).
+		if (extractor instanceof Promise || auditor instanceof Promise) {
+			return Promise.all([extractor, auditor]).then(([a, b]) => checkStages([["extractor", a], ["auditor", b]]));
+		}
+		checkStages([["extractor", extractor], ["auditor", auditor]]);
+	}
+	function checkStages(stages: readonly [ModelRole, PiEngine | undefined][]): void {
 		const missing = new Set<ModelSlotName>();
 		for (const [role, engine] of stages) if (!engine) missing.add(ROLE_SLOT[role]);
 		if (missing.size > 0) {
@@ -928,9 +934,10 @@ export function createExtractionPipeline(deps: ExtractionPipelineDeps): Extracti
 				`${digest === "" ? "" : `, digest ${digest.split("\n").length} lines`})`,
 		);
 		const t0 = performance.now();
+		const engine = stageEngine("extractor", deps.extractor);
 
 		const findings = await runExtractor(
-			stageEngine("extractor", deps.extractor),
+			engine instanceof Promise ? await engine : engine,
 			sourceId,
 			prompt,
 			new Set(graph.nodes.map((n) => n.id)),
@@ -961,8 +968,9 @@ export function createExtractionPipeline(deps: ExtractionPipelineDeps): Extracti
 		// projection omits messageId (2026-10-13): the auditor is
 		// IDENTITY-only and never sees the passages, so anchors are useless
 		// to it — they add cognitive load, not signal.
+		const engine = stageEngine("auditor", deps.auditor);
 		const auditResult = await runAuditor(
-			stageEngine("auditor", deps.auditor),
+			engine instanceof Promise ? await engine : engine,
 			sourceId,
 			`Proposed findings from the extractor (the source itself is not available to you — the extractor is fully trusted; the propositions only — the reasoning chains are the merger's business, owner 2026-09-30):\n\n` +
 				`${JSON.stringify(
@@ -1111,7 +1119,8 @@ export function createExtractionPipeline(deps: ExtractionPipelineDeps): Extracti
 			// (2026-09-25): the write channel needs extractor + auditor
 			// engines AND their providers' keys; a refusal lands BEFORE any
 			// stage runs (typed — the trigger skips, routes surface 503).
-			refuseIfStagesUnready();
+			const readiness = refuseIfStagesUnready();
+			if (readiness) await readiness;
 			const covered = coverageOf(record.messages, graphStore.readCoverage(), chatId);
 			if (covered.uncovered.length === 0) {
 				console.info(`[extraction ${chatId}] nothing uncovered — no-op`);
@@ -1280,8 +1289,9 @@ export function createExtractionPipeline(deps: ExtractionPipelineDeps): Extracti
 				`${digest === "" ? "" : `, digest ${digest.split("\n").length} lines`})`,
 		);
 		const t0 = performance.now();
+		const engine = stageEngine("extractor", deps.extractor);
 		const findings = await runNotesExtractor(
-			stageEngine("extractor", deps.extractor),
+			engine instanceof Promise ? await engine : engine,
 			input.id,
 			prompt,
 			new Set(graph.nodes.map((n) => n.id)),
@@ -1307,7 +1317,8 @@ export function createExtractionPipeline(deps: ExtractionPipelineDeps): Extracti
 			// BYOK per-need gate (owner, 2026-09-22) + key presence
 			// (2026-09-25): same refusal as the chat front door — no
 			// extractor/auditor engines, or a stage key gone, no run.
-			refuseIfStagesUnready();
+			const readiness = refuseIfStagesUnready();
+			if (readiness) await readiness;
 			// CHUNKED like the chat path (owner, 2026-09-28): each chunk is a
 			// standalone extract → audit → merge, so no single call carries a
 			// whole large file. Abort mid-run keeps earlier chunks merged

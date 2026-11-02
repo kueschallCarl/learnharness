@@ -5,16 +5,19 @@ import {
 	type Api,
 	type Model,
 	type Models,
+	type MutableModels,
 	type StreamFunction,
 } from "@earendil-works/pi-ai";
 import { builtinProviders } from "@earendil-works/pi-ai/providers/all";
 import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
 import { type ModelRole } from "../../config.ts";
 import { DEFAULT_THINKING_ORDER } from "../core/settings.ts";
+import { normalizeCLIProxyBaseUrl } from "../core/auth-keys.ts";
 import packageMetadata from "../../package.json" with { type: "json" };
 import { chatGPTModel } from "./chatgpt-bridge.ts";
 import { chatGPTStream } from "./chatgpt-stream.ts";
 import type { ChatGPTDispatchLifecycle } from "./chatgpt-request-cycle.ts";
+import { cliProxyProvider } from "./cliproxy.ts";
 
 /** App identity is immutable and shared by Models and every native Agent.
  * Agent's default Pi attribution otherwise overrides the Models identity. */
@@ -46,7 +49,8 @@ export interface PiEngine {
 
 export type { ThinkingLevel };
 
-let collection: ReturnType<typeof createModels> | undefined;
+let collection: MutableModels | undefined;
+let proxyBase: string | undefined;
 
 /** The process-wide pi-ai Models collection — EVERY builtin provider's
  *  catalog (model slots wave, 2026-09-20): engines and the picker resolve
@@ -60,6 +64,16 @@ export function piModels() {
 	if (!collection) {
 		collection = createModels({ identity: APP_IDENTITY });
 		for (const provider of builtinProviders()) collection.setProvider(provider);
+	}
+	// The URL is env-reflected by the keys seam and can change without a
+	// restart. Replacing only this provider invalidates its prior model list.
+	let base: string | undefined;
+	try { base = process.env.CLIPROXY_BASE_URL ? normalizeCLIProxyBaseUrl(process.env.CLIPROXY_BASE_URL) : undefined; }
+	catch { base = undefined; } // Invalid ambient URL must not break other providers' catalogs.
+	if (base !== proxyBase) {
+		if (base) collection.setProvider(cliProxyProvider(base));
+		else collection.deleteProvider("cliproxy");
+		proxyBase = base;
 	}
 	return collection;
 }

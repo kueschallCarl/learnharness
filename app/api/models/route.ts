@@ -1,12 +1,13 @@
 import { modelCatalog, refreshConnectionCatalog } from "@/src/server";
 
 /**
- * The model picker's data (model-control wave): pi-ai's configured-provider
- * catalog as client-safe DTOs — id/name/cost/context/modality plus each
- * model's SUPPORTED thinking levels (per its thinkingLevelMap). Static
- * catalog: no network, stable within a pi-ai version.
+ * The model picker's data: pi-ai's configured providers plus CLIProxyAPI's
+ * live catalog. A failed proxy refresh is a 503, not a silently stale list.
  */
 export async function GET() {
-	await refreshConnectionCatalog();
+	try { await refreshConnectionCatalog(); }
+	catch (error) {
+		return Response.json({ error: error instanceof Error ? error.message : "CLIProxyAPI model list failed" }, { status: 503, headers: { "Cache-Control": "no-store" } });
+	}
 	return Response.json(modelCatalog(), { headers: { "Cache-Control": "no-store" } });
 }

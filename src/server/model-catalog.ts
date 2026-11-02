@@ -21,17 +21,23 @@ import { clampThinkingLevel, getSupportedThinkingLevels, type Api, type Model } 
 import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
 import { piModels } from "../agent/models.ts";
 import { chatGPTConnected, chatGPTModel, chatGPTModels, refreshChatGPTModels } from "../agent/chatgpt-bridge.ts";
+import { providerKeyPresent } from "./keys.ts";
 
-export async function refreshConnectionCatalog(): Promise<void> {
-	await refreshChatGPTModels(piModels().getModels("openai").filter((m): m is Model<"openai-responses"> => m.api === "openai-responses"));
+export async function refreshConnectionCatalog(provider?: "chatgpt" | "cliproxy"): Promise<void> {
+	if (!provider || provider === "chatgpt") {
+		await refreshChatGPTModels(piModels().getModels("openai").filter((m): m is Model<"openai-responses"> => m.api === "openai-responses"));
+	}
+	if ((!provider || provider === "cliproxy") && providerKeyPresent("cliproxy")) {
+		const result = await piModels().refresh({ providers: ["cliproxy"] });
+		const error = result.errors.get("cliproxy");
+		if (error) throw error;
+	}
 }
 function connectionModel(provider: string, id: string): Model<Api> | undefined {
 	return provider === "chatgpt" ? chatGPTModel(id) : piModels().getModel(provider, id);
 }
 function connectionProviderIds(): string[] { return [...piModels().getProviders().map((p) => p.id), "chatgpt"]; }
-import { settingsStore } from "../store/settings.ts";
 import { effectiveSettings } from "./stores.ts";
-import { keyValue } from "./keys.ts";
 import type { ChatSettings } from "../core/contracts/chat.ts";
 import type {
 	CatalogDefaults,
@@ -133,7 +139,7 @@ export function catalogProviders(): CatalogProvider[] {
 	return AUTH_PROVIDER_KEYS.map((p) => ({
 		id: p.id,
 		envVar: p.envVar,
-		keyPresent: keyValue(p.envVar) !== undefined,
+		keyPresent: providerKeyPresent(p.id),
 	})).concat([{ id: "chatgpt", envVar: "", keyPresent: chatGPTConnected() }]).sort((a, b) => a.id.localeCompare(b.id));
 }
 

@@ -50,6 +50,8 @@ Future teaching sessions can read the graph instead of starting from scratch. Pr
 
 Add your provider API key and choose your models, then start a session with what you want to understand. LearnHarness supports 30+ provider options, including OpenAI, Anthropic, Google, DeepSeek, and OpenRouter. Optional dictation and web search use separate service keys.
 
+To use a self-hosted CLIProxyAPI, enter its server base URL (before `/v1`) and API key in **Settings → Providers**. Both values are required before its live chat-model list appears; the same models can be chosen for session, practice, and background-agent roles. Proxy subscription models show $0 in the cost meter.
+
 All three platforms support in-app updates.
 
 ## Your keys, your data

@@ -24,7 +24,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { AUTH_KEYS, type AuthKeyStatus } from "@/src/core";
+import { AUTH_KEYS, CLIPROXY_BASE_URL, type AuthKeyStatus } from "@/src/core";
 import { SettingsGroup } from "./controls.tsx";
 import { ChatGPTConnection } from "./chatgpt-connection.tsx";
 import { ProviderMenuList } from "./model-menu.tsx";
@@ -81,7 +81,7 @@ export function classifyKeys(
 	const providerRows: AuthKeyStatus[] = [];
 	const unknownRows: AuthKeyStatus[] = [];
 	for (const s of statuses) {
-		if (isTool(s.id)) continue;
+		if (isTool(s.id) || s.id === CLIPROXY_BASE_URL) continue;
 		if (providerEnv.has(s.id) || (!s.info && providers === undefined)) providerRows.push(s);
 		else if (!s.info) unknownRows.push(s);
 		// (pre-interlude catalogs: a curated-but-unclassified status still
@@ -99,6 +99,7 @@ export function classifyKeys(
 /** The minimal status line, e.g. "…ab12 · 64 chars" (" · env" marks an
  *  environment-owned value — the row itself is read-only then). Pure. */
 export function keyStatusLine(status: AuthKeyStatus): string {
+	if (status.id === CLIPROXY_BASE_URL) return status.value ? `${status.value}${status.source === "env" ? " · env" : ""}` : "not set";
 	if (!status.present || !status.masked) return "not set";
 	const tail = status.masked.replace(/ \((\d+) chars\)$/, "");
 	const chars = status.masked.match(/\((\d+) chars\)$/)?.[1] ?? "?";
@@ -133,9 +134,12 @@ function KeyTableRow({
 	testid: string;
 }) {
 	const envOwned = status.source === "env";
-	const [value, setValue] = useState("");
+	const [value, setValue] = useState(status.value ?? "");
 	const [error, setError] = useState<string | null>(null);
 	const [busy, setBusy] = useState(false);
+	useEffect(() => {
+		if (status.id === CLIPROXY_BASE_URL) setValue(status.value ?? "");
+	}, [status.id, status.value]);
 
 	async function save() {
 		if (!value.trim() || busy) return;
@@ -143,7 +147,7 @@ function KeyTableRow({
 		setError(null);
 		const err = await onSave(value);
 		if (err) setError(err);
-		else setValue("");
+		else setValue(status.id === CLIPROXY_BASE_URL ? value.trim() : "");
 		setBusy(false);
 	}
 
@@ -157,14 +161,14 @@ function KeyTableRow({
 				<div className="flex items-center gap-2 rounded-sm px-1 py-1.5" data-testid={`${testid}-editor`}>
 					<span className="shrink-0 font-ui text-xs text-foreground">{label}</span>
 					<input
-						type="text"
+						type={status.id === CLIPROXY_BASE_URL ? "url" : "password"}
 						value={value}
 						onChange={(e) => setValue(e.target.value)}
 						onKeyDown={(e) => {
 							if (e.key === "Enter") void save();
 						}}
-						placeholder="Paste key…"
-						aria-label={`${label} key`}
+						placeholder={status.id === CLIPROXY_BASE_URL ? "https://proxy.example" : "Paste key…"}
+						aria-label={status.id === CLIPROXY_BASE_URL ? "CLIProxyAPI base URL" : `${label} key`}
 						data-testid={`${testid}-input`}
 						disabled={busy}
 						autoFocus
@@ -414,6 +418,20 @@ export function KeysSection({
 	return (
 		<>
 			<SettingsGroup label="Model API keys" testid="group-provider-keys">
+				<KeyTableRow
+					label="CLIProxyAPI URL"
+					status={statuses.find((s) => s.id === CLIPROXY_BASE_URL) ?? { id: CLIPROXY_BASE_URL, info: null, present: false, masked: null, source: "none", shadowedByEnv: false }}
+					expanded={openRow === CLIPROXY_BASE_URL}
+					onToggle={() => setOpenRow(openRow === CLIPROXY_BASE_URL ? null : CLIPROXY_BASE_URL)}
+					onSave={async (v) => {
+						const err = await saveKey(CLIPROXY_BASE_URL, v);
+						if (!err) setOpenRow(null);
+						return err;
+					}}
+					onCancel={() => setOpenRow(null)}
+					onDelete={() => deleteKey(CLIPROXY_BASE_URL)}
+					testid="key-cliproxy_base_url"
+				/>
 				{providerRows.map((status) => (
 					<KeyTableRow
 						key={status.id}
@@ -501,7 +519,7 @@ function AddProviderEditor({
 	return (
 		<>
 			<input
-				type="text"
+				type="password"
 				value={value}
 				onChange={(e) => setValue(e.target.value)}
 				onKeyDown={(e) => {

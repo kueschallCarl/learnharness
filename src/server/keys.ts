@@ -43,12 +43,14 @@ import {
 	AUTH_KEYS,
 	AUTH_PROVIDER_KEYS,
 	AUTH_PROVIDER_ENV_VARS,
+	CLIPROXY_BASE_URL,
 	type AuthKeyInfo,
 	type AuthKeyStatus,
 	genericProviderKeyGuard,
 	isKnownAuthKey,
 	isProviderEnvVar,
 	maskKey,
+	normalizeCLIProxyBaseUrl,
 	validateKeyShape,
 } from "../core/auth-keys.ts";
 import { authStore } from "../store/auth.ts";
@@ -75,7 +77,7 @@ function boot(): AuthBoot {
 /** Is `id` a WRITABLE key name — curated catalog or model-provider env
  *  var (provider-keys interlude: PUT/DELETE accept both). */
 export function isWritableAuthKey(id: string): boolean {
-	return isKnownAuthKey(id) || isProviderEnvVar(id);
+	return id === CLIPROXY_BASE_URL || isKnownAuthKey(id) || isProviderEnvVar(id);
 }
 
 /** The settings page's provider dropdown: every pi-ai provider that takes
@@ -109,6 +111,7 @@ export function initAuthEnv(): void {
 		// an env-exported OPENAI_API_KEY with a file copy gets honest shadow
 		// semantics, exactly like the curated vars.
 		...AUTH_PROVIDER_KEYS.map((p) => p.envVar),
+		CLIPROXY_BASE_URL,
 	]);
 	if (envKeysIgnored()) {
 		// THE FRESH-USER SWITCH: delete every managed env var (re-run on
@@ -152,7 +155,7 @@ export function resolveKeyStatuses(
 	 *  discovery surface). Curated keys always get rows, present or not. */
 	providerEnvVars: ReadonlySet<string> = new Set(),
 ): AuthKeyStatus[] {
-	const ids = new Set<string>([...AUTH_KEYS.map((k) => k.id), ...Object.keys(fileVars)]);
+	const ids = new Set<string>([...AUTH_KEYS.map((k) => k.id), CLIPROXY_BASE_URL, ...Object.keys(fileVars)]);
 	for (const envVar of providerEnvVars) {
 		if (env[envVar] !== undefined || fileVars[envVar] !== undefined) ids.add(envVar);
 	}
@@ -169,9 +172,10 @@ export function resolveKeyStatuses(
 			id,
 			info: AUTH_KEYS.find((k) => k.id === id) ?? null,
 			present: live !== undefined,
-			masked: live !== undefined ? `${maskKey(live)} (${live.trim().length} chars)` : null,
+			masked: live !== undefined && id !== CLIPROXY_BASE_URL ? `${maskKey(live)} (${live.trim().length} chars)` : null,
 			source: isRealEnv ? "env" : live !== undefined ? "file" : "none",
 			shadowedByEnv: isRealEnv && fileValue !== undefined && envValue !== fileValue,
+			...(id === CLIPROXY_BASE_URL && live !== undefined ? { value: live } : {}),
 		});
 	}
 	return rows;
@@ -202,6 +206,10 @@ export function keyValue(id: string): string | undefined {
  * no key at all: nothing to gate, present by definition. */
 export function providerKeyPresent(provider: string): boolean {
 	if (provider === "chatgpt") return chatGPTConnected();
+	if (provider === "cliproxy") {
+		try { return !!keyValue("CLIPROXY_API_KEY") && !!normalizeCLIProxyBaseUrl(keyValue(CLIPROXY_BASE_URL) ?? ""); }
+		catch { return false; }
+	}
 	const info = AUTH_PROVIDER_KEYS.find((p) => p.id === provider);
 	return info ? keyValue(info.envVar) !== undefined : true;
 }
@@ -213,8 +221,15 @@ export function providerKeyPresent(provider: string): boolean {
  * reports shadowedByEnv so the page can explain it).
  */
 export function saveKey(id: string, value: string): { ok: true; status: AuthKeyStatus } | { ok: false; error: string } {
-	const shape = isProviderEnvVar(id) ? genericProviderKeyGuard(id, value) : validateKeyShape(id, value);
-	if (!shape.ok) return { ok: false, error: shape.error };
+	if (id === CLIPROXY_BASE_URL) {
+		let normalized: string;
+		try { normalized = normalizeCLIProxyBaseUrl(value); }
+		catch (error) { return { ok: false, error: (error as Error).message }; }
+		value = normalized;
+	} else {
+		const shape = isProviderEnvVar(id) ? genericProviderKeyGuard(id, value) : validateKeyShape(id, value);
+		if (!shape.ok) return { ok: false, error: shape.error };
+	}
 	const trimmed = value.trim();
 	authStore.setAuthVar(id, trimmed);
 	const record = boot();

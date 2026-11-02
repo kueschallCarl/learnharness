@@ -6,7 +6,7 @@ import {
 	type AgentBuildOptions,
 	type TeachingAgent,
 } from "../agent/teacher-agent.ts";
-import { piEngineForSpec, type PiEngine } from "../agent/models.ts";
+import { piEngineForSpec, piModels, type PiEngine } from "../agent/models.ts";
 import { chatGPTBackgroundAllowed, chatGPTScopeCurrent } from "../agent/chatgpt-bridge.ts";
 import { chatGPTStreamError } from "../agent/chatgpt-stream.ts";
 import { ChatGPTRequestCycle, type ChatGPTDispatchLifecycle } from "../agent/chatgpt-request-cycle.ts";
@@ -134,8 +134,11 @@ setTurnRunner(async (chatId, input) => {
  *  the chain (role override → slot → NOTHING) may end empty, and undefined
  *  flows through to the per-need refusal gates (runner/extraction), read
  *  FRESH so a settings PUT between dispatch and spawn lands. */
-function resolveEngine(role: ModelRole): PiEngine | undefined {
+function resolveEngine(role: ModelRole): PiEngine | undefined | Promise<PiEngine> {
 	const spec = resolveRoleSpec(role, stores.settingsStore.readSettings());
+	if (spec?.provider === "cliproxy" && providerKeyPresent("cliproxy") && !piModels().getModel("cliproxy", spec.id)) {
+		return refreshConnectionCatalog("cliproxy").then(() => piEngineForSpec(spec));
+	}
 	return spec ? piEngineForSpec(spec) : undefined;
 }
 
@@ -207,7 +210,7 @@ export async function handleChatInput(
 	// path. The affected tier is strong — the conversation chain's own tier
 	// (a chat.model override still resolves through it).
 	if (conversation.provider === "chatgpt") {
-		await refreshConnectionCatalog();
+		await refreshConnectionCatalog("chatgpt");
 		if (input.type === "steers" && !chatGPTBackgroundAllowed()) {
 			return Response.json({ error: "ChatGPT background use is off in this app. Automatic follow-up remains deferred in its queue." }, { status: 403 });
 		}
@@ -216,6 +219,10 @@ export async function handleChatInput(
 		const envelope = providerKeyMissingEnvelope(conversation.provider, ["strong"]);
 		console.info(`[chat ${chatId}] turn refused — ${JSON.stringify(envelope)}`);
 		return Response.json(envelope, { status: 503 });
+	}
+	if (conversation.provider === "cliproxy") {
+		try { await refreshConnectionCatalog("cliproxy"); }
+		catch (error) { return Response.json({ error: error instanceof Error ? error.message : "CLIProxyAPI model list failed" }, { status: 503 }); }
 	}
 
 	// THE COMPACTION GATE (owner round 14, 2026-10-05 — the structural

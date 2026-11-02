@@ -74,6 +74,8 @@ export interface AuthProviderInfo {
  * truthy-for-every-var proxy env) and asserts EXACT equality with this
  * table — a pi-ai upgrade that adds/renames a provider key fails the gate
  * loudly instead of drifting silently.
+ * CLIProxyAPI is app-owned, not a builtin: the no-drift assertion excludes
+ * that one row and still pins every pi-ai-derived entry exactly.
  *
  * EXCLUDED by owner spec — providers whose auth is not a plain key this
  * wave: github-copilot (OAuth), amazon-bedrock (AWS creds), google-vertex
@@ -84,11 +86,14 @@ export interface AuthProviderInfo {
  * / moonshotai-cn, opencode / opencode-go, the qwen-token-plan pair,
  * xiaomi variants) each keep their own row — the UI groups as it wishes.
  */
+// App-owned dynamic provider, not part of pi-ai's builtin no-drift table.
+export const CLIPROXY_BASE_URL = "CLIPROXY_BASE_URL";
 export const AUTH_PROVIDER_KEYS: readonly AuthProviderInfo[] = [
 	{ id: "ant-ling", envVar: "ANT_LING_API_KEY", label: "Ant Ling" },
 	{ id: "anthropic", envVar: "ANTHROPIC_API_KEY", label: "Anthropic" },
 	{ id: "baseten", envVar: "BASETEN_API_KEY", label: "Baseten" },
 	{ id: "cerebras", envVar: "CEREBRAS_API_KEY", label: "Cerebras" },
+	{ id: "cliproxy", envVar: "CLIPROXY_API_KEY", label: "CLIProxyAPI" },
 	{ id: "deepseek", envVar: "DEEPSEEK_API_KEY", label: "DeepSeek" },
 	{ id: "fireworks", envVar: "FIREWORKS_API_KEY", label: "Fireworks" },
 	{ id: "google", envVar: "GEMINI_API_KEY", label: "Google" },
@@ -177,6 +182,19 @@ export function genericProviderKeyGuard(id: string, rawValue: string): KeyShapeR
 	return { ok: false, error: `${id} must be at least 12 characters with no whitespace` };
 }
 
+/** A non-secret URL held alongside provider keys in auth.json. Only a base
+ * URL belongs here: no embedded credentials or query that the UI could expose. */
+export function normalizeCLIProxyBaseUrl(raw: string): string {
+	let url: URL;
+	try { url = new URL(raw.trim()); }
+	catch { throw new Error("CLIProxyAPI base URL must be an http(s) URL before /v1"); }
+	const base = url.href.replace(/\/+$/, "");
+	if (!["http:", "https:"].includes(url.protocol) || !url.hostname || url.username || url.password || url.search || url.hash || base.endsWith("/v1")) {
+		throw new Error("CLIProxyAPI base URL must be an http(s) URL before /v1 without credentials, query or fragment");
+	}
+	return base;
+}
+
 /** A masked key never leaves the server as plaintext (owner decision:
  *  last 4 chars + length — enough to identify which key is stored after
  *  rotating between several, and to spot a mis-pasted family). */
@@ -201,4 +219,6 @@ export interface AuthKeyStatus {
 	/** True when the file holds a value that the environment shadows — the
 	 *  settings page explains why a saved key is not the live one. */
 	shadowedByEnv: boolean;
+	/** Only populated for the non-secret CLIProxyAPI base URL. */
+	value?: string;
 }

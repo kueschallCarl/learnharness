@@ -30,6 +30,8 @@ for (const varName of [
 	"GOOGLE_CSE_ID",
 	"OPENAI_API_KEY",
 	"FUTURE_PLANS_TOKEN",
+	"CLIPROXY_API_KEY",
+	"CLIPROXY_BASE_URL",
 ]) {
 	delete process.env[varName];
 }
@@ -61,6 +63,8 @@ const ENV_OWNED = "sk-or-v1-envvalue99";
 after(() => {
 	delete process.env.OPENROUTER_API_KEY;
 	delete process.env.DEEPGRAM_API_KEY;
+	delete process.env.CLIPROXY_API_KEY;
+	delete process.env.CLIPROXY_BASE_URL;
 	delete process.env.OPENAI_API_KEY;
 	fs.rmSync(TMP, { recursive: true, force: true });
 });
@@ -192,6 +196,22 @@ describe("saveKey / deleteKey (immediate effect, no restart)", () => {
 			deleteKey("OPENROUTER_API_KEY");
 			assert.ok(!("OPENROUTER_API_KEY" in authStore.authVars()));
 		});
+	});
+});
+
+describe("CLIProxyAPI provider settings", () => {
+	it("rejects invalid URLs without storing and reflects normalized URL and key immediately", () => {
+		const invalid = saveKey("CLIPROXY_BASE_URL", "http://user:pass@proxy.example");
+		assert.ok(!invalid.ok);
+		assert.equal(authStore.authVars().CLIPROXY_BASE_URL, undefined);
+		assert.ok(isWritableAuthKey("CLIPROXY_BASE_URL"));
+		assert.ok(saveKey("CLIPROXY_BASE_URL", " http://127.0.0.1:8317/// ").ok);
+		assert.equal(authStore.authVars().CLIPROXY_BASE_URL, "http://127.0.0.1:8317");
+		assert.equal(keyStatuses().find((s) => s.id === "CLIPROXY_BASE_URL")?.value, "http://127.0.0.1:8317");
+		assert.ok(saveKey("CLIPROXY_API_KEY", "test-proxy-key-123456").ok);
+		assert.equal(keyStatuses().find((s) => s.id === "CLIPROXY_API_KEY")?.value, undefined, "secret never appears in GET status");
+		deleteKey("CLIPROXY_API_KEY");
+		assert.equal(deleteKey("CLIPROXY_BASE_URL").source, "none", "the DELETE response keeps an absent URL status");
 	});
 });
 

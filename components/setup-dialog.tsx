@@ -273,7 +273,11 @@ export function SetupDialog({
 		setError(null);
 		fetch("/api/keys")
 			.then((r) => r.json())
-			.then((b: { providers?: ProviderKeyInfo[] }) => { if (!cancelled) setKeyProviders(b.providers ?? []); })
+			.then((b: { providers?: ProviderKeyInfo[] }) => {
+				// The first-key screen accepts only one value; CLIProxyAPI
+				// needs a URL as well, so configure it in Settings → Providers.
+				if (!cancelled) setKeyProviders((b.providers ?? []).filter((p) => p.id !== "cliproxy"));
+			})
 			.catch(() => { if (!cancelled) setKeyProviders([]); });
 		fetch("/api/models")
 			.then((r) => { if (!r.ok) throw new Error("Catalog unavailable"); return r.json(); })

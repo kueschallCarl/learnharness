@@ -238,22 +238,23 @@ describe("provider-neutral raw agent loops", { concurrency: false }, () => {
 		}
 	}
 
-	it("all AUTH_PROVIDER_KEYS resolve their own plain-key env values in a fresh in-memory Models collection", async () => {
+	it("all builtin AUTH_PROVIDER_KEYS resolve their own plain-key env values in a fresh in-memory Models collection", async () => {
 		// No production singleton, credential files, process.env, OAuth refresh,
 		// or model refresh: this is a broad resolver contract, not wire coverage.
 		await isolated({}, async () => {
-			const env = Object.fromEntries(AUTH_PROVIDER_KEYS.map(({ envVar }) => [envVar, `dummy-resolver-${envVar}`]));
+			const builtinKeys = AUTH_PROVIDER_KEYS.filter((p) => p.id !== "cliproxy"); // app-owned dynamic provider is not in builtinProviders()
+			const env = Object.fromEntries(builtinKeys.map(({ envVar }) => [envVar, `dummy-resolver-${envVar}`]));
 			const models = createModels({ authContext: { env: async (name) => env[name], fileExists: async () => false } });
 			for (const provider of builtinProviders()) models.setProvider(provider);
-			for (const { id, envVar } of AUTH_PROVIDER_KEYS) {
+			for (const { id, envVar } of builtinKeys) {
 				const resolved = await models.getAuth(id);
 				assert.ok(resolved, id);
 				assert.equal(resolved.source, envVar, id);
 				assert.equal(resolved.auth.apiKey, env[envVar], id);
 			}
 			// In particular, intentionally shared variables must serve BOTH rows.
-			for (const envVar of new Set(AUTH_PROVIDER_KEYS.map((p) => p.envVar))) {
-				const siblings = AUTH_PROVIDER_KEYS.filter((p) => p.envVar === envVar);
+			for (const envVar of new Set(builtinKeys.map((p) => p.envVar))) {
+				const siblings = builtinKeys.filter((p) => p.envVar === envVar);
 				if (siblings.length < 2) continue;
 				for (const { id } of siblings) assert.equal((await models.getAuth(id))?.auth.apiKey, env[envVar], id);
 			}
