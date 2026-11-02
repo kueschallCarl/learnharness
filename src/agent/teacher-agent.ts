@@ -167,6 +167,38 @@ function makeQuestionStopper() {
 	};
 }
 
+/** PROSE BEFORE CHECKS, enforced (fork, 2026-10-31). The teaching doctrine
+ *  already says "a check with no prose before it is a failed check", but
+ *  Claude models with interleaved thinking routinely skipped it after a
+ *  rocq_check result: the explanation stayed in hidden thinking and the
+ *  learner opened a check about teaching he never saw. Returns the block
+ *  reason when a teacher check/ask call has no visible text since the
+ *  learner's last answer (a resolved question result or a user message);
+ *  predictions are exempt — they open a step before its teaching. */
+export function missingProseReason(
+	toolName: string,
+	args: unknown,
+	messages: readonly AgentMessage[],
+	current: AgentMessage,
+): string | undefined {
+	if (toolName !== "quiz" && toolName !== "explain" && toolName !== "ask_user_question") return undefined;
+	if ((args as { type?: unknown } | null)?.type === "predict") return undefined;
+	const visible = (m: AgentMessage) =>
+		m.role === "assistant" && Array.isArray(m.content) && m.content.some((b) => b.type === "text" && b.text.trim() !== "");
+	if (visible(current)) return undefined;
+	for (let i = messages.length - 1; i >= 0; i--) {
+		const m = messages[i]!;
+		if (m.role === "user") break;
+		if (m.role === "toolResult" && !m.isError && (QUESTION_TOOLS as readonly string[]).includes(m.toolName)) break;
+		if (visible(m)) return undefined;
+	}
+	return (
+		"Blocked: the learner has seen no teaching since his last answer. Thinking and tool results " +
+		"(rocq_check included) are invisible to him. Write the step's explanation as visible text first, " +
+		"then pose this question again."
+	);
+}
+
 function baseAgentOptions(kind: AgentKind, opts: AgentBuildOptions, tools: AgentTool<any, any>[]) {
 	// Practice never reaches the role fallback (the handler ALWAYS injects
 	// the session's conversation engine — practice rides the same
@@ -233,6 +265,14 @@ function baseAgentOptions(kind: AgentKind, opts: AgentBuildOptions, tools: Agent
 			}
 			opts.requestCycle?.prepare(request);
 		},
+		...(kind === "teacher"
+			? {
+					beforeToolCall: async ({ toolCall, args, context, assistantMessage }) => {
+						const reason = missingProseReason(toolCall.name, args, context.messages, assistantMessage);
+						return reason ? { block: true, reason } : undefined;
+					},
+				}
+			: {}),
 	});
 	if (opts.onUsage) {
 		agent.subscribe((event: AgentEvent) => {
