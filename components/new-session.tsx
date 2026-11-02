@@ -31,7 +31,7 @@ export type DraftPick = { id: string; name: string; statement: string };
  * server-side (per-session models, owner 2026-09-28).
  */
 
-const DOCK = "mx-auto w-full max-w-[46rem] px-4";
+const DOCK = "mx-auto w-full max-w-[52rem] px-4";
 
 /**
  * The draft's whole behavior as one pure seam: create the session (title =

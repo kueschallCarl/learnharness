@@ -89,8 +89,10 @@ import { useSettingsSaved } from "@/components/settings-signal";
  * same place — width polish only.
  */
 const COLUMN = "mx-auto w-full max-w-none px-6";
-const DOCK = "mx-auto w-full max-w-[46rem] px-4";
-// The DOCK container's fixed width (46rem) and the plan marginalia's
+const DOCK = "mx-auto w-full max-w-[52rem] px-4";
+// The DOCK container's fixed width (52rem; fork 2026-10-25, was 46rem —
+// wider questions, while a ~1380px column still leaves the flank above
+// MARGIN_MIN_W) and the plan marginalia's
 // geometry (owner, plan-placement round): the bare diagram sits in the
 // dock band's RIGHT flank — MARGIN_GAP from the DOCK container's edge and
 // the same from the column's right edge. The box width is pure CSS, so
@@ -98,7 +100,7 @@ const DOCK = "mx-auto w-full max-w-[46rem] px-4";
 // the fade floor (owner, resize round) — below it the marginalia fades
 // out over the normal transition instead of popping away, and it stays
 // mounted while the question owns the band so widening fades it back.
-const DOCK_W = 46 * 16;
+const DOCK_W = 52 * 16;
 const MARGIN_GAP = 16;
 const MARGIN_MIN_W = 220;
 // The dock overlay's gradient band (h-24) — part of the reserved tail.
@@ -2008,9 +2010,13 @@ function DockOverlay({
 	// zero on macOS overlay scrollbars, the real width on classic platforms.
 	// The same measure owns the QUESTION/PROBLEM HEIGHT CAP (owner round,
 	// 2026-10-05): the old fixed fractions (55dvh / 40vh) cut long problems
-	// off absurdly short — the cap is now the AVAILABLE COLUMN (the
-	// scroller already starts below the top bar) minus a 2rem breathing
-	// gap, carried as --dock-max-h for the docks' scroll areas.
+	// off absurdly short. Fork, 2026-10-25: the cap bounds the WHOLE dock
+	// form (question + controls), carried as --dock-max-h: 75% of the
+	// AVAILABLE COLUMN, never more than the column minus 160px. A
+	// near-full-height dock left a reserved tail taller than the screen after
+	// the fold — scrolling up showed only blank space — and its controls
+	// pushed the question's start under the header; the 160px floor keeps
+	// that tail (form + stats row + gradient) within one screen.
 	const [sbInset, setSbInset] = useState(0);
 	const [dockMaxH, setDockMaxH] = useState<number | null>(null);
 	useEffect(() => {
@@ -2018,7 +2024,8 @@ function DockOverlay({
 		if (!el) return;
 		const measure = () => {
 			setSbInset(Math.round((el.offsetWidth - el.clientWidth) / 2));
-			setDockMaxH(Math.max(el.clientHeight - 32, 160));
+			const h = el.clientHeight;
+			setDockMaxH(Math.max(Math.min(Math.round(h * 0.75), h - 160), 160));
 		};
 		measure();
 		window.addEventListener("resize", measure);

@@ -540,11 +540,14 @@ function QuestionDockForm({
 	}, [kbdIdx]);
 
 	return (
-		<div ref={rootRef} data-testid="question-dock">
-			{/* Question area — scrolls internally if very tall; the bottom row stays put.
-			    Capped by the measured column (--dock-max-h; the old fixed 55dvh cut
-			    long questions short — owner round, 2026-10-05). */}
-			<div data-session-find-root="" className="max-h-[var(--dock-max-h,55dvh)] overflow-y-auto px-4 pt-3">
+		<div ref={rootRef} data-testid="question-dock" className="flex max-h-[var(--dock-max-h,60dvh)] flex-col">
+			{/* Question area — scrolls internally if very tall; the confidence row
+			    and the answer form below never shrink. The cap (--dock-max-h) is
+			    on the WHOLE form, not this area: capping only the question let a
+			    long one plus the controls outgrow the column, pushing its start
+			    under the header (fork, 2026-10-25). min-h keeps it readable on
+			    short windows. */}
+			<div data-session-find-root="" className="min-h-24 overflow-y-auto px-4 pt-3">
 				<div className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
 					{toolName === "probe"
 						? "Probe"
@@ -734,7 +737,7 @@ function QuestionDockForm({
 				GRAYS it out — the layout holds, no value is sent, the IDK
 				signal stands alone. */}
 			{kind === "quiz" && (
-				<div className="border-t border-border/60 px-4 py-2.5">
+				<div className="shrink-0 border-t border-border/60 px-4 py-2.5">
 					<div className="flex items-center gap-3">
 						<span
 							className={cn(
@@ -817,7 +820,7 @@ function QuestionDockForm({
 			    is for dumping, soon dictated; the button submits); text mode
 			    keeps "Your answer" with Enter-to-submit. */}
 			<form
-				className="border-t border-border/60 p-1.5"
+				className="shrink-0 border-t border-border/60 p-1.5"
 				onSubmit={(e) => {
 					e.preventDefault();
 					submit();
