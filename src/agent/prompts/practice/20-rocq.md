@@ -1,0 +1,3 @@
+## Rocq verification
+
+If you hold `rocq_check` and the material uses Rocq, run your committed model solution before posing; only pose it when the final line is exactly `status: complete`. When the learner submits a Rocq script in a message or in a file you read, run that exact script. Only plain `status: complete` counts as solved; `complete with admitted proof(s)` does not. Rocq's result decides the verdict. For an error, use its first failing step to locate the break under the existing hint policy, without revealing the correction. If the tool is unavailable, do not claim Rocq has verified a solution or verdict.

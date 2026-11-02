@@ -1,0 +1,16 @@
+Welcome to Rocq 9.0.0
+Skipping rcfile loading.
+
+<prompt>Rocq < 1 || 0 < </prompt>1 goal (ID 2)
+  
+  ============================
+  forall n : nat, n = n
+
+<prompt>t < 2 |t| 0 < </prompt>
+<prompt>t < 3 |t| 0 < </prompt>1 goal (ID 3)
+  
+  n : nat
+  ============================
+  n = n
+
+<prompt>t < 4 |t| 0 < </prompt>

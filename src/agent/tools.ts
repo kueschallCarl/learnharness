@@ -24,6 +24,7 @@ import { lsTool } from "./tools/ls.ts";
 import { findTool } from "./tools/find.ts";
 import { grepTool } from "./tools/grep.ts";
 import { healToolRecord } from "./tools/heal.ts";
+import { resolveRocqBinary, rocqToolFor } from "./tools/rocq.ts";
 import type { GraphStore } from "../core/ports.ts";
 
 export { jobTools };
@@ -434,6 +435,7 @@ function withoutMechanics(enabled?: EnabledTools): EnabledTools | undefined {
 export function createTeacherTools(
 	ctx: TeacherToolContext,
 	enabled?: EnabledTools,
+	rocqBinary: string | null = enabled?.rocq === false ? null : resolveRocqBinary(),
 ): Record<string, AgentTool<any>> {
 	// Quizzing mechanics (owner 2026-09-27): free-recall swaps the teach
 	// quiz for the teach explain — one quizzing tool at a time, whichever
@@ -457,6 +459,7 @@ export function createTeacherTools(
 			ls: lsTool,
 			find: findTool,
 			grep: grepTool,
+			...(rocqBinary && enabled?.rocq !== false ? { rocq_check: rocqToolFor(rocqBinary) } : {}),
 			...planTools(ctx),
 			...jobTools({ chatId: ctx.chatId, jobStore: ctx.jobStore, spawn: ctx.spawn, searchAvailable: ctx.searchAvailable }),
 		},

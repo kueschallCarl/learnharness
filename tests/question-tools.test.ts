@@ -253,14 +253,10 @@ describe("quiz tool descriptions carry the complete, phase-correct example", () 
 // ─── tool availability (2026-09 settings seam) ───────────────────────────────
 
 describe("tool toggles (core/pending.ts + factories)", () => {
-	it("TOGGLEABLE_TOOLS: the sub-agent dispatch tools; quiz/ask/read stay off the list", () => {
-		// THE DEFINITIVE vocabulary (adjudicated with the user 2026-09-19, P2
-		// reconciliation): the job tools only. quiz/ask_user_question are
-		// permanently always-on (the prober's assessment + teaching doctrine
-		// are built on graded questions — the wedge danger), as are the
-		// learner-fs set, plan tools, and probe_done. The settings WRITE side
-		// validates against this list (settings-body).
-		assert.deepEqual(TOGGLEABLE_TOOLS, ["research", "demo", "visual", "pdf"]);
+	it("TOGGLEABLE_TOOLS: the job dispatch tools and Rocq; quiz/ask/read stay off the list", () => {
+		// The settings write side validates against the definitive list.
+		// Quiz/ask and learner-fs remain always-on.
+		assert.deepEqual(TOGGLEABLE_TOOLS, ["research", "demo", "visual", "pdf", "rocq"]);
 	});
 
 	it("createProberTools: absent record = full set; explicit false drops exactly that tool; probe_done survives everything", () => {
@@ -294,15 +290,15 @@ describe("tool toggles (core/pending.ts + factories)", () => {
 			jobStore,
 			spawn: () => {},
 		};
-		const full = Object.keys(createTeacherTools(ctx)).sort();
+		const full = Object.keys(createTeacherTools(ctx, undefined, null)).sort();
 		assert.deepEqual(full, ["ask_user_question", "demo", "find", "grep", "ls", "pdf", "plan_init", "quiz", "read", "research", "visual"]);
 
-		const noResearch = Object.keys(createTeacherTools(ctx, { research: false })).sort();
+		const noResearch = Object.keys(createTeacherTools(ctx, { research: false }, null)).sort();
 		assert.deepEqual(noResearch, ["ask_user_question", "demo", "find", "grep", "ls", "pdf", "plan_init", "quiz", "read", "visual"]);
 
 		// absent = enabled: an empty record and undefined behave identically
 		assert.deepEqual(
-			Object.keys(createTeacherTools(ctx, {})).sort(),
+			Object.keys(createTeacherTools(ctx, {}, null)).sort(),
 			full,
 			"absent keys mean enabled — old records behave exactly as today",
 		);
@@ -310,9 +306,9 @@ describe("tool toggles (core/pending.ts + factories)", () => {
 		// The mechanic switch (owner 2026-09-27): free-recall swaps the teach
 		// quiz for the teach explain — one quizzing tool, whichever is armed.
 		const freeFull = ["ask_user_question", "demo", "explain", "find", "grep", "ls", "pdf", "plan_init", "read", "research", "visual"];
-		assert.deepEqual(Object.keys(createTeacherTools(ctx, { explain: true })).sort(), freeFull);
+		assert.deepEqual(Object.keys(createTeacherTools(ctx, { explain: true }, null)).sort(), freeFull);
 		assert.deepEqual(
-			Object.keys(createTeacherTools(ctx, { explain: true, research: false })).sort(),
+			Object.keys(createTeacherTools(ctx, { explain: true, research: false }, null)).sort(),
 			freeFull.filter((t) => t !== "research"),
 			"mechanics and plain toggles compose",
 		);

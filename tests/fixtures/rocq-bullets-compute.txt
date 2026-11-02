@@ -1,0 +1,52 @@
+Welcome to Rocq 9.0.0
+Skipping rcfile loading.
+
+<prompt>Rocq < 1 || 0 < </prompt>1 goal (ID 3)
+  
+  ============================
+  forall a b : nat, a = a /\ b = b
+
+<prompt>t < 2 |t| 0 < </prompt>
+<prompt>t < 3 |t| 0 < </prompt>1 goal (ID 5)
+  
+  a, b : nat
+  ============================
+  a = a /\ b = b
+
+<prompt>t < 4 |t| 0 < </prompt>2 goals (ID 7)
+  
+  a, b : nat
+  ============================
+  a = a
+
+goal 2 (ID 8) is:
+ b = b
+
+<prompt>t < 5 |t| 0 < </prompt>1 goal (ID 7)
+  
+  a, b : nat
+  ============================
+  a = a
+
+<prompt>t < 6 |t| 0 < </prompt><infomsg>
+This subproof is complete, but there are some unfocused goals.
+Focus next goal with bullet -.
+</infomsg>
+1 goal
+
+goal 1 (ID 8) is:
+ b = b
+
+<prompt>t < 7 |t| 0 < </prompt>1 goal (ID 8)
+  
+  a, b : nat
+  ============================
+  b = b
+
+<prompt>t < 8 |t| 0 < </prompt>No more goals.
+
+<prompt>t < 9 |t| 0 < </prompt>
+<prompt>Rocq < 10 || 0 < </prompt>     = 5
+     : nat
+
+<prompt>Rocq < 11 || 0 < </prompt>

@@ -64,7 +64,9 @@ export const JOB_TOOLS = ["research", "demo", "visual"] as const;
 
 /** The tools a user may toggle off in settings — THE DEFINITIVE LIST
  *  (adjudicated 2026-09-19, P2 reconciliation: the sub-agent JOB tools
- *  only — research/demo/visual/pdf). Deliberately NOT toggleable, ever:
+ *  only — research/demo/visual/pdf; fork 2026-10-25: plus `rocq`, which
+ *  controls `rocq_check` when a Rocq executable is available). Deliberately
+ *  NOT toggleable, ever:
  *  quiz + ask_user_question (the prober's flow is graded-quiz brackets →
  *  probe_done; quiz-off would collapse the assessment and teaching
  *  doctrine is built on graded verification — the wedge danger), the
@@ -75,8 +77,8 @@ export const JOB_TOOLS = ["research", "demo", "visual"] as const;
  *  key = 400 with the supported list); the read-side sanitizer stays
  *  lenient for forward-compat. The names are the MODEL-FACING tool names
  *  (research, not researcher; pdf is the PDF-reader dispatch, sources v0
- *  2026-09). */
-export const TOGGLEABLE_TOOLS = ["research", "demo", "visual", "pdf"] as const;
+ *  2026-09) — except `rocq`, the toggle key for the `rocq_check` tool. */
+export const TOGGLEABLE_TOOLS = ["research", "demo", "visual", "pdf", "rocq"] as const;
 
 /** The keys the settings WRITE side accepts in agent.tools: the plain
  *  toggleables PLUS the quizzing-mechanics switch (`explain: true` arms
@@ -142,6 +144,7 @@ const ACTIVITY_LABELS: Record<string, string> = {
 	ls: "Listing a directory…",
 	find: "Finding files…",
 	grep: "Searching file contents…",
+	rocq_check: "Checking with Rocq…",
 	research: "Dispatching research…",
 	demo: "Building a demo…",
 	visual: "Making a visual…",

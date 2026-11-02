@@ -1,0 +1,13 @@
+Welcome to Rocq 9.0.0
+Skipping rcfile loading.
+
+<prompt>Rocq < 1 || 0 < </prompt>1 goal (ID 1)
+  
+  ============================
+  True
+
+<prompt>admit_foo < 2 |admit_foo| 0 < </prompt>
+<prompt>admit_foo < 3 |admit_foo| 0 < </prompt>No more goals.
+
+<prompt>admit_foo < 4 |admit_foo| 0 < </prompt>
+<prompt>Rocq < 5 || 0 < </prompt>

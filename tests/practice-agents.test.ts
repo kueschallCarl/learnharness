@@ -197,7 +197,7 @@ describe("target validation — names normalize to ids, unknowns reject", () => 
 
 describe("the practice agent", () => {
 	it("bare registry: the session pair + the learner-filesystem set — no question, plan, or lesson tools", () => {
-		const tools = practiceTools(ctxOf([]));
+		const tools = practiceTools(ctxOf([]), undefined, null);
 		assert.deepEqual(
 			Object.keys(tools).sort(),
 			["conclude", "find", "grep", "ls", "problem", "read"],
@@ -207,15 +207,14 @@ describe("the practice agent", () => {
 	it("THE RARELY-NEEDED SET (owner round 10): jobs + map readers compose in when their roots are passed", () => {
 		const jobs = { chatId: "c1", jobStore: null as never, spawn: (() => {}) as never, searchAvailable: () => false };
 		const graph = { chatStore: null as never, graphStore: null as never };
-		const tools = practiceTools({ ...ctxOf([]), jobs, graph });
-		// Both jobs remain available keylessly; the prober's two map
-		// readers stay behind their existing settings gate. Practice does
-		// not apply the teacher/prober user tool-toggle filter.
+		const tools = practiceTools({ ...ctxOf([]), jobs, graph }, undefined, null);
+		// Research and pdf remain available keylessly; map readers use their
+		// existing settings gate. Only Rocq uses the practice tool toggle.
 		assert.deepEqual(
 			Object.keys(tools).sort(),
 			["conclude", "find", "grep", "list_propositions", "list_sessions", "ls", "pdf", "problem", "read", "research"],
 		);
-		const withSearch = practiceTools({ ...ctxOf([]), jobs: { ...jobs, searchAvailable: () => true }, graph });
+		const withSearch = practiceTools({ ...ctxOf([]), jobs: { ...jobs, searchAvailable: () => true }, graph }, undefined, null);
 		assert.ok(withSearch.research, "a live engine also keeps research");
 	});
 

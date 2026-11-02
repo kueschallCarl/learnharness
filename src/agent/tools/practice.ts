@@ -27,6 +27,8 @@ import { activeProblemOf } from "../../core/native-messages.ts";
 import type { LhMessage } from "../../core/native-messages.ts";
 import { concludeResult, invalidInputResult, problemResult } from "../tool-execute.ts";
 import { healEncodedArguments, healToolRecord } from "./heal.ts";
+import { resolveRocqBinary, rocqToolFor } from "./rocq.ts";
+import type { EnabledTools } from "../../core/pending.ts";
 
 
 /** The record-reading context the gates need (the plan-tools idiom). */
@@ -220,16 +222,17 @@ export function concludeTool(gate: PracticeGate): AgentTool<typeof concludeInput
 }
 
 /** The practice toolset (the practice agent's whole registry). */
-export function practiceTools(ctx: PracticeToolContext): Record<string, AgentTool<any>> {
+export function practiceTools(
+	ctx: PracticeToolContext,
+	enabled?: EnabledTools,
+	rocqBinary: string | null = enabled?.rocq === false ? null : resolveRocqBinary(),
+): Record<string, AgentTool<any>> {
 	// ONE gate per turn, shared by both tools — the intra-turn truth.
 	const gate = createPracticeGate(ctx);
 	// THE RARELY-NEEDED SET (owner round 10): read/ls/find/grep over the
 	// learner's files (always — the same read-only set the teacher and
-	// prober carry), the research + pdf jobs (available without search
-	// keys; demo/visual stay teach-only), and
-	// the prober's map readers when the settings gate opened. None are
-	// toggle-filtered: problem/conclude are the session; these are
-	// exceptions the doctrine says to reach for rarely.
+	// prober carry), the research + pdf jobs, and the gated map readers.
+	// Only Rocq uses the practice registry's tool toggle.
 	const jobs = ctx.jobs ? jobTools(ctx.jobs) : null;
 	// healToolRecord (owner, 2026-10-09 — the whitehead generalization):
 	// the standard argument heal over the WHOLE registry. problem/conclude
@@ -242,6 +245,7 @@ export function practiceTools(ctx: PracticeToolContext): Record<string, AgentToo
 		ls: lsTool,
 		find: findTool,
 		grep: grepTool,
+		...(rocqBinary && enabled?.rocq !== false ? { rocq_check: rocqToolFor(rocqBinary) } : {}),
 		...(jobs?.research ? { research: jobs.research } : {}),
 		...(jobs ? { pdf: jobs.pdf! } : {}),
 		...(ctx.graph ? proberGraphTools(ctx.graph) : {}),
