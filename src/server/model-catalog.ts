@@ -243,10 +243,17 @@ export function validateChatSettings(settings: ChatSettings): SettingsValidation
 	return { ok: true };
 }
 
-export function validateModelsSettings(settings: ModelsSettings): SettingsValidation {
+/** `stored` is the record's current models section. A slot whose model is
+ *  unchanged from it is not re-checked: it passed this gate when written,
+ *  and a provider catalog can drop it later (a ChatGPT model retired, a
+ *  key removed). Re-checking it would block every edit of the OTHER slots,
+ *  because the picker writes the whole section. */
+export function validateModelsSettings(settings: ModelsSettings, stored?: ModelsSettings): SettingsValidation {
 	for (const name of MODEL_SLOTS) {
 		const slot = settings[name];
 		if (!slot) continue;
+		const before = stored?.[name]?.model;
+		if (slot.model && before && slot.model.provider === before.provider && slot.model.id === before.id) continue;
 		const verdict = validateSlotSpec(name, slot);
 		if (!verdict.ok) return verdict;
 	}

@@ -77,7 +77,7 @@ export async function PUT(request: Request, ctx: { params: Promise<{ section: st
 	// catalog gate the chat section gets — a slot must name a real
 	// provider+model and a thinking level it supports.
 	if (section === "models") {
-		const verdict = validateModelsSettings(parsed.settings as ModelsSettings);
+		const verdict = validateModelsSettings(parsed.settings as ModelsSettings, readSettingsRecord()?.models);
 		if (!verdict.ok) {
 			return Response.json({ error: verdict.error, supported: verdict.supported }, { status: 400 });
 		}

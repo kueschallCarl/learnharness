@@ -246,6 +246,16 @@ describe("the models-section validation gate", () => {
 	it("accepts empty settings (the clear-slots write)", () => {
 		assert.deepEqual(validateModelsSettings({}), { ok: true });
 	});
+
+	it("a stored pin the catalog dropped does not block editing another slot", () => {
+		// The picker writes the whole section: changing strong re-sends cheap
+		// unchanged. A retired model there must not reject the write, but
+		// choosing it anew still must.
+		const stale = { model: { provider: "chatgpt", id: "gpt-retired" } };
+		const glm = { model: { provider: "openrouter", id: "z-ai/glm-5.3-flash" } };
+		assert.deepEqual(validateModelsSettings({ strong: glm, cheap: stale }, { strong: stale, cheap: stale }), { ok: true });
+		assert.equal(validateModelsSettings({ strong: glm, cheap: stale }, { strong: stale }).ok, false);
+	});
 });
 
 describe("the settings validation gate", () => {
